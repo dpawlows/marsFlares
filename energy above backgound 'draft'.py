@@ -66,7 +66,7 @@ def match_dates_with_cdf(file_path, cdf_urls):
             stripped_line = line.strip()
             if stripped_line[-4:].startswith('M'):
                 date = stripped_line.split()[0]  # Extract the date part from the line
-                day, month, year = date.split('/')
+                month, day, year = date.split('/')
                 date_formatted = f"{year}{month.zfill(2)}{day.zfill(2)}"  # Convert to CDF filename format
                 print(f"Processing date: {date}")
                 for cdf_url in cdf_urls:
@@ -78,7 +78,9 @@ def match_dates_with_cdf(file_path, cdf_urls):
 
 # Example usage:
 file_path = 'flare catalog.txt'
-url_list = ['https://lasp.colorado.edu/maven/sdc/public/data/sci/euv/l2/2023/01/', 'https://lasp.colorado.edu/maven/sdc/public/data/sci/euv/l2/2023/02/','https://lasp.colorado.edu/maven/sdc/public/data/sci/euv/l2/2023/03/','https://lasp.colorado.edu/maven/sdc/public/data/sci/euv/l2/2023/04/']
+url_list = ['https://lasp.colorado.edu/maven/sdc/public/data/sci/euv/l2/2023/01/', 'https://lasp.colorado.edu/maven/sdc/public/data/sci/euv/l2/2023/02/','https://lasp.colorado.edu/maven/sdc/public/data/sci/euv/l2/2023/03/','https://lasp.colorado.edu/maven/sdc/public/data/sci/euv/l2/2023/04/','https://lasp.colorado.edu/maven/sdc/public/data/sci/euv/l2/2023/05/'
+            ,'https://lasp.colorado.edu/maven/sdc/public/data/sci/euv/l2/2023/06/','https://lasp.colorado.edu/maven/sdc/public/data/sci/euv/l2/2023/07/','https://lasp.colorado.edu/maven/sdc/public/data/sci/euv/l2/2023/08/','https://lasp.colorado.edu/maven/sdc/public/data/sci/euv/l2/2023/09/','https://lasp.colorado.edu/maven/sdc/public/data/sci/euv/l2/2023/10/'
+            ,'https://lasp.colorado.edu/maven/sdc/public/data/sci/euv/l2/2023/11/']
 
 cdf_urls = []
 for url in url_list:
