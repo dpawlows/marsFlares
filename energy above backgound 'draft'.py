@@ -188,13 +188,21 @@ with open(output_file, mode='w', newline='') as file:
             result['area_simps_c']
         ])
         
-        # Plot irradiance vs time for Diode A and Diode C
+        # Plot irradiance vs time for Diode A
         plt.figure()
         plt.plot(result['filtered_time'], result['filtered_data_diode_a'], label='Diode A')
+        plt.xlabel('Time (Unix)')
+        plt.ylabel('Irradiance')
+        plt.title(f'Irradiance vs Time for Diode A on {date}')
+        plt.legend()
+        plt.show()
+
+        # Plot irradiance vs time for Diode C
+        plt.figure()
         plt.plot(result['filtered_time'], result['filtered_data_diode_c'], label='Diode C')
         plt.xlabel('Time (Unix)')
         plt.ylabel('Irradiance')
-        plt.title(f'Irradiance vs Time for {date}')
+        plt.title(f'Irradiance vs Time for Diode C on {date}')
         plt.legend()
         plt.show()
         
@@ -207,5 +215,4 @@ with open(output_file, mode='w', newline='') as file:
 
 # Optionally, save results to a file or further process them
 print(f"Results have been saved to {output_file}")
-
 
