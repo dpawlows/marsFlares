@@ -53,6 +53,7 @@ def convert_hhmmss_to_unix(date, time_str):
 
 # Function to process CDF files and plot data
 def process_cdf(file_url, start_time, end_time):
+    temp_file_path = 'temp.cdf'
     try:
         response = requests.get(file_url)
         response.raise_for_status()
@@ -74,7 +75,7 @@ def process_cdf(file_url, start_time, end_time):
                         filtered_time.append(current_time)
                         filtered_data_diode_a.append(cdf['data'][i, 0])
                         filtered_data_diode_c.append(cdf['data'][i, 2])
-
+                        
             filtered_time = np.array(filtered_time)
             filtered_data_diode_a = np.array(filtered_data_diode_a)
             filtered_data_diode_c = np.array(filtered_data_diode_c)
@@ -87,26 +88,31 @@ def process_cdf(file_url, start_time, end_time):
             area_trapz_c = np.trapz(filtered_data_diode_c, filtered_time)
             area_simps_c = simps(filtered_data_diode_c, filtered_time)
             
-            # Fit a line between the first and last point in the filtered data
+            # Calculate the total area under the curve using Simpson's rule and trapezoidal rule
+            total_area_simps_a = simps(filtered_data_diode_a, filtered_time)
+            total_area_trapz_a = np.trapz(filtered_data_diode_a, filtered_time)
+
+            total_area_simps_c = simps(filtered_data_diode_c, filtered_time)
+            total_area_trapz_c = np.trapz(filtered_data_diode_c, filtered_time)
+
+            # Calculate the area of the trapezoid formed by the first and last points
             x0, x1 = filtered_time[0], filtered_time[-1]
-            y0, y1 = filtered_data_diode_a[0], filtered_data_diode_a[-1]
-            slope_a = (y1 - y0) / (x1 - x0)
-            intercept_a = y0 - slope_a * x0
+            y0_a, y1_a = filtered_data_diode_a[0], filtered_data_diode_a[-1]
+            y0_c, y1_c = filtered_data_diode_c[0], filtered_data_diode_c[-1]
+
+            # Area of the trapezoid for Diode A
+            trapezoid_area_a = 0.5 * (y0_a + y1_a) * (x1 - x0)
             
-            linear_fit_a = slope_a * filtered_time + intercept_a
+            # Area of the trapezoid for Diode C
+            trapezoid_area_c = 0.5 * (y0_c + y1_c) * (x1 - x0)
+
+            # Area above the trapezoid (background)
+            area_above_background_simps_a = total_area_simps_a - trapezoid_area_a
+            area_above_background_trapz_a = total_area_trapz_a - trapezoid_area_a
+
+            area_above_background_simps_c = total_area_simps_c - trapezoid_area_c
+            area_above_background_trapz_c = total_area_trapz_c - trapezoid_area_c
             
-            y0, y1 = filtered_data_diode_c[0], filtered_data_diode_c[-1]
-            slope_c = (y1 - y0) / (x1 - x0)
-            intercept_c = y0 - slope_c * x0
-            
-            linear_fit_c = slope_c * filtered_time + intercept_c
-            
-            # Calculate the area under the curve above the fitted line
-            area_trapz_above_line_a = np.trapz(filtered_data_diode_a - linear_fit_a, filtered_time)
-            area_simps_above_line_a = simps(filtered_data_diode_a - linear_fit_a, filtered_time)
-            
-            area_trapz_above_line_c = np.trapz(filtered_data_diode_c - linear_fit_c, filtered_time)
-            area_simps_above_line_c = simps(filtered_data_diode_c - linear_fit_c, filtered_time)
     finally:
         # Ensure the temporary file is removed even if an error occurs
         if os.path.exists(temp_file_path):
@@ -121,10 +127,10 @@ def process_cdf(file_url, start_time, end_time):
         'area_simps_a': area_simps_a,
         'area_trapz_c': area_trapz_c,
         'area_simps_c': area_simps_c,
-        'area_trapz_above_line_a': area_trapz_above_line_a,
-        'area_simps_above_line_a': area_simps_above_line_a,
-        'area_trapz_above_line_c': area_trapz_above_line_c,
-        'area_simps_above_line_c': area_simps_above_line_c
+        'area_above_background_simps_a': area_above_background_simps_a,
+        'area_above_background_trapz_a': area_above_background_trapz_a,
+        'area_above_background_simps_c': area_above_background_simps_c,
+        'area_above_background_trapz_c': area_above_background_trapz_c
     }
 
 
@@ -156,7 +162,7 @@ matched_dates = match_dates_with_cdf(file_path, cdf_urls)
 output_file = 'energy_analysis_results.csv'
 with open(output_file, mode='w', newline='') as file:
     writer = csv.writer(file)
-    writer.writerow(['Date','start_time','end_time', 'duration_of_flare','File', 'area_trapz_diaode_a', 'area_simps_diaode_a', 'area_trapz_diaode_c', 'area_simps_diaode_c','area_trapz_above_line_a','area_simps_above_line_a','area_trapz_above_line_c','area_simps_above_line_c'])
+    writer.writerow(['Date','start_time','end_time', 'duration_of_flare','File', 'area_trapz_a', 'area_simps_a', 'area_trapz_c', 'area_simps_c','area_above_background_trapz_a','area_above_background_simps_a','area_above_background_trapz_c','area_above_background_simps_c'])
 
     for date, line, file_url in matched_dates:
         start_time_str = line.split()[1]
@@ -183,10 +189,10 @@ with open(output_file, mode='w', newline='') as file:
             result['area_simps_a'], 
             result['area_trapz_c'], 
             result['area_simps_c'],
-            result['area_trapz_above_line_a'],
-            result['area_simps_above_line_a'],
-            result['area_trapz_above_line_c'],
-            result['area_simps_above_line_c']
+            result['area_above_background_trapz_a'],
+            result['area_above_background_simps_a'],
+            result['area_above_background_trapz_c'],
+            result['area_above_background_simps_c']
         ])
     '''    
         # Convert Unix time to human-readable format for plotting
