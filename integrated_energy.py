@@ -59,7 +59,7 @@ def match_dates_with_cdf(file_path, cdf_urls):
         matched_dates = []
         for line in lines:
             stripped_line = line.strip()
-            if stripped_line[-4:].startswith('M'):
+            if stripped_line[-4:].startswith(('M','X')):
                 date = stripped_line.split()[0]  # Extract the date part from the line
                 month, day, year = date.split('/')
                 date_formatted = f"{year}{month.zfill(2)}{day.zfill(2)}"  # Convert to CDF filename format
@@ -72,15 +72,16 @@ def match_dates_with_cdf(file_path, cdf_urls):
 
 # Function to convert Unix time to human-readable format
 def unix_to_datetime(unix_time):
-    return datetime.utcfromtimestamp(unix_time)
-
+    return datetime.fromtimestamp(unix_time)
 # Function to convert HH:MM:SS format to Unix time
-def convert_hhmmss_to_unix_with_timezone(date, time_str, tz_name):
-    local_tz = pytz.timezone(tz_name)
-    naive_dt = datetime.strptime(f"{date} {time_str}", '%m/%d/%Y %H:%M:%S')
-    local_dt = local_tz.localize(naive_dt)
-    utc_dt = local_dt.astimezone(pytz.utc)
-    return int(utc_dt.timestamp())
+def convert_hhmmss_to_unix(date, time_str):
+    """
+    Convert date and time (in HH:MM:SS format) to Unix timestamp.
+    Assumes the input date and time are in UTC.
+    """
+    date_time_str = f"{date} {time_str}"
+    dt = datetime.strptime(date_time_str, '%m/%d/%Y %H:%M:%S')
+    return int(dt.timestamp())
 
 # Function to process CDF files and plot data
 def process_cdf(file_url, start_time, end_time):
@@ -110,7 +111,25 @@ def process_cdf(file_url, start_time, end_time):
             filtered_time = np.array(filtered_time)
             filtered_data_diode_a = np.array(filtered_data_diode_a)
             filtered_data_diode_c = np.array(filtered_data_diode_c)
-
+            '''
+            # Check if the filtered arrays are empty
+            if filtered_time.size == 0 or filtered_data_diode_a.size == 0 or filtered_data_diode_c.size == 0:
+                print(f"No data found in the specified time range for {file_url}")
+                return {
+                    'file': os.path.basename(file_url),
+                    'filtered_time': [],
+                    'filtered_data_diode_a': [],
+                    'filtered_data_diode_c': [],
+                    'area_trapz_a': 0,
+                    'area_simps_a': 0,
+                    'area_trapz_c': 0,
+                    'area_simps_c': 0,
+                    'area_above_background_simps_a': 0,
+                    'area_above_background_trapz_a': 0,
+                    'area_above_background_simps_c': 0,
+                    'area_above_background_trapz_c': 0
+                }
+            '''
             # Compute area for Diode A
             area_trapz_a = np.trapz(filtered_data_diode_a, filtered_time)
             area_simps_a = simps(filtered_data_diode_a, filtered_time)
@@ -202,14 +221,13 @@ with open(output_file, mode='w', newline='') as file:
         end_time_int=datetime.strptime(end_time_str,  '%H:%M:%S')
         delta_t=end_time_int-start_time_int
         
-        # Convert start and end times to Unix time
-        start_time_unix = convert_hhmmss_to_unix_with_timezone(date, start_time_str,'America/New_York') 
-        end_time_unix = convert_hhmmss_to_unix_with_timezone(date, end_time_str,'America/New_York') 
-        
+        start_time_unix = convert_hhmmss_to_unix(date, start_time_str)
+        end_time_unix = convert_hhmmss_to_unix(date, end_time_str)
+
         print(f"Processing file for date: {date}, start time: {start_time_str}, end time: {end_time_str}")
         
         result = process_cdf(file_url, start_time_unix, end_time_unix)
-        breakpoint()
+
         writer.writerow([
             date, 
             start_time_str,
@@ -225,7 +243,7 @@ with open(output_file, mode='w', newline='') as file:
             result['area_above_background_trapz_c'],
             result['area_above_background_simps_c']
         ])
-    '''    
+'''
         # Convert Unix time to human-readable format for plotting
         filtered_time_hr = [unix_to_datetime(t) for t in result['filtered_time']]
 
