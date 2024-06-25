@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sun Jun  9 13:22:39 2024
+Created on Tue Jun 25 19:23:11 2024
 
 @author: joahb
 """
-
+'''
+this file includes full day plots just to see how the days are looking before and after
+flares take place
+'''
 import requests
 from bs4 import BeautifulSoup
 import os
@@ -84,14 +87,13 @@ def convert_hhmmss_to_unix(date, time_str):
     return int(dt.timestamp())
 
 # Function to process CDF files and plot data
-def process_cdf(file_url, start_time, end_time):
+def process_cdf(file_url, start_time, end_time, day_start_time, day_end_time):
     temp_file_path = 'temp.cdf'
     try:
         response = requests.get(file_url)
         response.raise_for_status()
 
         # Save the CDF file content temporarily
-        temp_file_path = 'temp.cdf'
         with open(temp_file_path, 'wb') as temp_file:
             temp_file.write(response.content)
 
@@ -99,25 +101,38 @@ def process_cdf(file_url, start_time, end_time):
             filtered_time = []
             filtered_data_diode_a = []
             filtered_data_diode_c = []
+            full_day_time = []
+            full_day_data_diode_a = []
+            full_day_data_diode_c = []
 
             for i in range(len(cdf['time_unix'])):
                 current_time = cdf['time_unix'][i]
-                if start_time <= current_time <= end_time:
-                    if cdf['flag'][i] == 0:
-                        filtered_time.append(current_time)
-                        filtered_data_diode_a.append(cdf['data'][i, 0])
-                        filtered_data_diode_c.append(cdf['data'][i, 2])
-           
-            # Convert lists to numpy arrays            
+                if day_start_time <= current_time <= day_end_time:
+                    full_day_time.append(current_time)
+                    full_day_data_diode_a.append(cdf['data'][i, 0])
+                    full_day_data_diode_c.append(cdf['data'][i, 2])
+
+                if start_time <= current_time <= end_time and cdf['flag'][i] == 0:
+                    filtered_time.append(current_time)
+                    filtered_data_diode_a.append(cdf['data'][i, 0])
+                    filtered_data_diode_c.append(cdf['data'][i, 2])
+
+            # Convert lists to numpy arrays
             filtered_time = np.array(filtered_time)
             filtered_data_diode_a = np.array(filtered_data_diode_a)
             filtered_data_diode_c = np.array(filtered_data_diode_c)
-            
+            full_day_time = np.array(full_day_time)
+            full_day_data_diode_a = np.array(full_day_data_diode_a)
+            full_day_data_diode_c = np.array(full_day_data_diode_c)
+            '''
             # Debug prints
             print(f"Filtered time: {filtered_time}")
             print(f"Filtered data (Diode A): {filtered_data_diode_a}")
             print(f"Filtered data (Diode C): {filtered_data_diode_c}")
-            
+            print(f"Full day time: {full_day_time}")
+            print(f"Full day data (Diode A): {full_day_data_diode_a}")
+            print(f"Full day data (Diode C): {full_day_data_diode_c}")
+            '''
             # Check if the filtered arrays are empty
             if filtered_time.size == 0 or filtered_data_diode_a.size == 0 or filtered_data_diode_c.size == 0:
                 print(f"No data found in the specified time range for {file_url}")
@@ -126,49 +141,11 @@ def process_cdf(file_url, start_time, end_time):
                     'filtered_time': [],
                     'filtered_data_diode_a': [],
                     'filtered_data_diode_c': [],
-                    'area_trapz_a': 0,
-                    'area_simps_a': 0,
-                    'area_trapz_c': 0,
-                    'area_simps_c': 0,
-                    'area_above_background_simps_a': 0,
-                    'area_above_background_trapz_a': 0,
-                    'area_above_background_simps_c': 0,
-                    'area_above_background_trapz_c': 0
+                    'full_day_time': full_day_time,
+                    'full_day_data_diode_a': full_day_data_diode_a,
+                    'full_day_data_diode_c': full_day_data_diode_c
                 }
-            
-            # Compute area for Diode A
-            area_trapz_a = np.trapz(filtered_data_diode_a, filtered_time)
-            area_simps_a = simps(filtered_data_diode_a, filtered_time)
 
-            # Compute area for Diode C
-            area_trapz_c = np.trapz(filtered_data_diode_c, filtered_time)
-            area_simps_c = simps(filtered_data_diode_c, filtered_time)
-            
-            # Calculate the total area under the curve using Simpson's rule and trapezoidal rule
-            total_area_simps_a = simps(filtered_data_diode_a, filtered_time)
-            total_area_trapz_a = np.trapz(filtered_data_diode_a, filtered_time)
-
-            total_area_simps_c = simps(filtered_data_diode_c, filtered_time)
-            total_area_trapz_c = np.trapz(filtered_data_diode_c, filtered_time)
-
-            # Calculate the area of the trapezoid formed by the first and last points
-            x0, x1 = filtered_time[0], filtered_time[-1]
-            y0_a, y1_a = filtered_data_diode_a[0], filtered_data_diode_a[-1]
-            y0_c, y1_c = filtered_data_diode_c[0], filtered_data_diode_c[-1]
-            
-            # Area of the trapezoid for Diode A
-            trapezoid_area_a = 0.5 * (y0_a + y1_a) * (x1 - x0)
-            
-            # Area of the trapezoid for Diode C
-            trapezoid_area_c = 0.5 * (y0_c + y1_c) * (x1 - x0)
-
-            # Area above the trapezoid (background)
-            area_above_background_simps_a = total_area_simps_a - trapezoid_area_a
-            area_above_background_trapz_a = total_area_trapz_a - trapezoid_area_a
-
-            area_above_background_simps_c = total_area_simps_c - trapezoid_area_c
-            area_above_background_trapz_c = total_area_trapz_c - trapezoid_area_c
-            
     finally:
         # Ensure the temporary file is removed even if an error occurs
         if os.path.exists(temp_file_path):
@@ -179,14 +156,9 @@ def process_cdf(file_url, start_time, end_time):
         'filtered_time': filtered_time,
         'filtered_data_diode_a': filtered_data_diode_a,
         'filtered_data_diode_c': filtered_data_diode_c,
-        'area_trapz_a': area_trapz_a,
-        'area_simps_a': area_simps_a,
-        'area_trapz_c': area_trapz_c,
-        'area_simps_c': area_simps_c,
-        'area_above_background_simps_a': area_above_background_simps_a,
-        'area_above_background_trapz_a': area_above_background_trapz_a,
-        'area_above_background_simps_c': area_above_background_simps_c,
-        'area_above_background_trapz_c': area_above_background_trapz_c
+        'full_day_time': full_day_time,
+        'full_day_data_diode_a': full_day_data_diode_a,
+        'full_day_data_diode_c': full_day_data_diode_c
     }
 
 
@@ -199,6 +171,7 @@ def generate_url_list(start_year, end_year):
             urls.append(url_template.format(year=year, month=month))
     return urls
 
+# Main code
 # Main code
 file_path = 'flare catalog.txt'
 start_year = 2023
@@ -214,65 +187,70 @@ for url in url_list:
         print(f"Failed to retrieve CDF files from {url}: {e}")
 
 matched_dates = match_dates_with_cdf(file_path, cdf_urls)
-#print(matched_dates)
-output_file = 'energy_analysis_results.csv'
-with open(output_file, mode='w', newline='') as file:
-    writer = csv.writer(file)
-    writer.writerow(['Date','start_time','end_time', 'duration_of_flare','File', 'area_trapz_a', 'area_simps_a', 'area_trapz_c', 'area_simps_c','area_above_background_trapz_a','area_above_background_simps_a','area_above_background_trapz_c','area_above_background_simps_c'])
 
-    for date, line, file_url in matched_dates:
-        start_time_str = line.split()[1]
-        end_time_str = line.split()[3]
-        start_time_int= datetime.strptime(start_time_str,  '%H:%M:%S')
-        end_time_int=datetime.strptime(end_time_str,  '%H:%M:%S')
-        delta_t=end_time_int-start_time_int
-        
-        start_time_unix = convert_hhmmss_to_unix(date, start_time_str)
-        end_time_unix = convert_hhmmss_to_unix(date, end_time_str)
+for date, line, file_url in matched_dates:
+    start_time_str = line.split()[1]
+    end_time_str = line.split()[3]
 
-        print(f"Processing file for date: {date}, start time: {start_time_str}, end time: {end_time_str}")
-        
-        result = process_cdf(file_url, start_time_unix, end_time_unix)
+    start_time_unix = convert_hhmmss_to_unix(date, start_time_str)
+    end_time_unix = convert_hhmmss_to_unix(date, end_time_str)
 
-        writer.writerow([
-            date, 
-            start_time_str,
-            end_time_str,
-            delta_t,
-            result['file'], 
-            result['area_trapz_a'], 
-            result['area_simps_a'], 
-            result['area_trapz_c'], 
-            result['area_simps_c'],
-            result['area_above_background_trapz_a'],
-            result['area_above_background_simps_a'],
-            result['area_above_background_trapz_c'],
-            result['area_above_background_simps_c']
-        ])
-'''
-        # Convert Unix time to human-readable format for plotting
-        filtered_time_hr = [unix_to_datetime(t) for t in result['filtered_time']]
+    # Get the Unix timestamps for the start and end of the day
+    day_start_time_unix = convert_hhmmss_to_unix(date, '00:00:00')
+    day_end_time_unix = convert_hhmmss_to_unix(date, '23:59:59')
 
-        # Plot irradiance vs time for Diode A
-        plt.figure()
-        plt.plot(filtered_time_hr, result['filtered_data_diode_a'], label='Diode A')
-        plt.xlabel('Time (UTC)')
-        plt.ylabel('Irradiance')
-        plt.title(f'Irradiance vs Time for Diode A - {date}')
-        plt.legend()
-        plt.xticks(rotation=45)
-        plt.tight_layout()
-        plt.show()
-        
-        # Plot irradiance vs time for Diode C
-        plt.figure()
-        plt.plot(filtered_time_hr, result['filtered_data_diode_c'], label='Diode C')
-        plt.xlabel('Time (UTC)')
-        plt.ylabel('Irradiance')
-        plt.title(f'Irradiance vs Time for Diode C - {date}')
-        plt.legend()
-        plt.xticks(rotation=45)
-        plt.tight_layout()
-        plt.show()
-'''
-print(f"Results have been saved to {output_file}")
+    print(f"Processing file for date: {date}, start time: {start_time_str}, end time: {end_time_str}")
+
+    result = process_cdf(file_url, start_time_unix, end_time_unix, day_start_time_unix, day_end_time_unix)
+
+    # Convert Unix time to human-readable format for plotting
+    filtered_time_hr = [unix_to_datetime(t) for t in result['filtered_time']]
+    full_day_time_hr = [unix_to_datetime(t) for t in result['full_day_time']]
+
+    # Plot irradiance vs time for Diode A (Flare Period)
+    plt.figure()
+    plt.plot(filtered_time_hr, result['filtered_data_diode_a'], label='Diode A (Flare Period)')
+    plt.xlabel('Time (UTC)')
+    plt.ylabel('Irradiance')
+    plt.title(f'Irradiance vs Time for Diode A (Flare) - {date}')
+    plt.legend()
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()
+
+    # Plot irradiance vs time for Diode C (Flare Period)
+    plt.figure()
+    plt.plot(filtered_time_hr, result['filtered_data_diode_c'], label='Diode C (Flare Period)')
+    plt.xlabel('Time (UTC)')
+    plt.ylabel('Irradiance')
+    plt.title(f'Irradiance vs Time for Diode C (Flare) - {date}')
+    plt.legend()
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()
+
+    # Plot irradiance vs time for Diode A (Full Day)
+    plt.figure()
+    plt.plot(full_day_time_hr, result['full_day_data_diode_a'], label='Diode A (Full Day)')
+    plt.axvline(x=unix_to_datetime(start_time_unix), color='r', linestyle='--', label='Flare Start')
+    plt.axvline(x=unix_to_datetime(end_time_unix), color='g', linestyle='--', label='Flare End')
+    plt.xlabel('Time (UTC)')
+    plt.ylabel('Irradiance')
+    plt.title(f'Irradiance vs Time for Diode A (Full Day) - {date}')
+    plt.legend()
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()
+
+    # Plot irradiance vs time for Diode C (Full Day)
+    plt.figure()
+    plt.plot(full_day_time_hr, result['full_day_data_diode_c'], label='Diode C (Full Day)')
+    plt.axvline(x=unix_to_datetime(start_time_unix), color='r', linestyle='--', label='Flare Start')
+    plt.axvline(x=unix_to_datetime(end_time_unix), color='g', linestyle='--', label='Flare End')
+    plt.xlabel('Time (UTC)')
+    plt.ylabel('Irradiance')
+    plt.title(f'Irradiance vs Time for Diode C (Full Day) - {date}')
+    plt.legend()
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()
